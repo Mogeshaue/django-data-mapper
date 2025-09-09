@@ -22,37 +22,65 @@
 <div class="row">
     <div class="col-md-8">
         <div class="card">
-            <div class="card-header bg-primary text-white">
-                <h4><i class="fas fa-arrows-alt-h"></i> Map Fields</h4>
-                <small>Map CSV/Excel columns to {{ session.target_model }} fields</small>
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <div>
+                    <h4><i class="fas fa-arrows-alt-h"></i> Map Fields</h4>
+                    <small>Map CSV/Excel columns to {{ session.target_model }} fields</small>
+                </div>
+                <div>
+                    <button type="button" class="btn btn-light btn-sm me-2" id="validateMapping">
+                        <i class="fas fa-check-circle"></i> Validate
+                    </button>
+                    <button type="button" class="btn btn-light btn-sm" id="autoSuggest">
+                        <i class="fas fa-magic"></i> Auto-Suggest
+                    </button>
+                </div>
             </div>
             <div class="card-body">
+                <!-- Validation Results -->
+                <div id="validationResults" class="mb-4" style="display: none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6><i class="fas fa-clipboard-check"></i> Validation Results 
+                                <span id="validationScore" class="badge bg-secondary ms-2"></span>
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div id="validationContent"></div>
+                        </div>
+                    </div>
+                </div>
+                
                 <form id="mapping-form" method="post" action="{% url 'process_file' session.id %}">
                     {% csrf_token %}
                     
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle"></i> 
-                        Suggested mappings have been auto-detected. Please review and adjust as needed.
+                        Suggested mappings have been auto-detected. Use the validation button to check your mappings before processing.
                     </div>
                     
-                    <div class="mb-4">
+                    <div class="mb-4" id="fieldMappingsContainer">
                         {% for csv_field in csv_headers %}
-                        <div class="field-mapping-row row align-items-center">
-                            <div class="col-md-5">
+                        <div class="field-mapping-row row align-items-center mb-3">
+                            <div class="col-md-4">
                                 <label class="form-label">
                                     <strong>{{ csv_field }}</strong>
-                                    <small class="text-muted">(CSV/Excel)</small>
+                                    <small class="text-muted d-block">(CSV Column)</small>
+                                    <span class="confidence-badge" data-csv-field="{{ csv_field }}" style="display: none;"></span>
                                 </label>
                             </div>
-                            <div class="col-md-2 text-center">
+                            <div class="col-md-1 text-center">
                                 <i class="fas fa-arrow-right text-primary"></i>
                             </div>
                             <div class="col-md-5">
                                 <select class="form-select mapping-select" 
-                                        data-csv-field="{{ csv_field }}">
+                                        data-csv-field="{{ csv_field }}"
+                                        name="mapping_{{ csv_field }}">
                                     <option value="">-- Skip this field --</option>
                                     {% for field_name, field_info in model_fields.items %}
                                         <option value="{{ field_name }}" 
+                                                data-required="{{ field_info.required }}"
+                                                data-type="{{ field_info.type }}"
                                                 {% if field_mappings|get_item:csv_field == field_name %}selected{% endif %}>
                                             {{ field_name }}
                                             {% if field_info.required %}<span class="text-danger">*</span>{% endif %}
@@ -60,6 +88,13 @@
                                         </option>
                                     {% endfor %}
                                 </select>
+                                <div class="field-validation-feedback" data-csv-field="{{ csv_field }}" style="display: none;"></div>
+                            </div>
+                            <div class="col-md-2">
+                                <button type="button" class="btn btn-outline-secondary btn-sm preview-data-btn" 
+                                        data-csv-field="{{ csv_field }}" title="Preview sample data">
+                                    <i class="fas fa-eye"></i>
+                                </button>
                             </div>
                         </div>
                         {% endfor %}
@@ -69,7 +104,7 @@
                         <a href="{% url 'model_selection' session.id %}" class="btn btn-secondary">
                             <i class="fas fa-arrow-left"></i> Back
                         </a>
-                        <button type="submit" class="btn btn-primary">
+                        <button type="submit" class="btn btn-primary" id="processBtn">
                             <i class="fas fa-cogs"></i> Process File
                         </button>
                     </div>
@@ -79,11 +114,12 @@
     </div>
     
     <div class="col-md-4">
+        <!-- Model Fields Info -->
         <div class="card">
             <div class="card-header bg-info text-white">
                 <h5><i class="fas fa-list"></i> Model Fields</h5>
             </div>
-            <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+            <div class="card-body" style="max-height: 300px; overflow-y: auto;">
                 <dl>
                     {% for field_name, field_info in model_fields.items %}
                         <dt>
@@ -133,36 +169,315 @@
         {% endif %}
     </div>
 </div>
-{% endblock %}
 
-{% block extra_js %}
+<!-- Data Preview Modal -->
+<div class="modal fade" id="dataPreviewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Sample Data Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="previewContent"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
-$(document).ready(function() {
+document.addEventListener('DOMContentLoaded', function() {
+    const mappingSelects = document.querySelectorAll('.mapping-select');
+    const validateBtn = document.getElementById('validateMapping');
+    const autoSuggestBtn = document.getElementById('autoSuggest');
+    const validationResults = document.getElementById('validationResults');
+    const previewBtns = document.querySelectorAll('.preview-data-btn');
+    
+    // Current mappings and model name
+    const modelName = "{{ session.target_model }}";
+    const previewData = JSON.parse('{{ preview_data|escapejs }}');
+    
     // Update mappings via AJAX when changed
-    $('.mapping-select').on('change', function() {
-        var csvField = $(this).data('csv-field');
-        var modelField = $(this).val();
+    mappingSelects.forEach(select => {
+        select.addEventListener('change', function() {
+            updateMapping(this);
+            updateFieldValidation(this);
+        });
+    });
+    
+    // Validate mapping button
+    validateBtn.addEventListener('click', function() {
+        validateCurrentMapping();
+    });
+    
+    // Auto-suggest button
+    autoSuggestBtn.addEventListener('click', function() {
+        autoSuggestMappings();
+    });
+    
+    // Preview data buttons
+    previewBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            showDataPreview(this.dataset.csvField);
+        });
+    });
+    
+    // Update individual mapping
+    async function updateMapping(selectElement) {
+        const csvField = selectElement.dataset.csvField;
+        const modelField = selectElement.value;
         
-        $.ajax({
-            url: "{% url 'update_mapping' session.id %}",
-            type: 'POST',
-            data: JSON.stringify({
-                'csv_field': csvField,
-                'model_field': modelField
-            }),
-            contentType: 'application/json',
-            headers: {
-                'X-CSRFToken': '{{ csrf_token }}'
-            },
-            success: function(response) {
-                if (response.success) {
-                    console.log('Mapping updated successfully');
-                }
-            },
-            error: function(xhr, status, error) {
-                console.error('Error updating mapping:', error);
+        try {
+            const response = await fetch("{% url 'update_mapping' session.id %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    csv_field: csvField,
+                    model_field: modelField
+                })
+            });
+            
+            const data = await response.json();
+            if (!data.success) {
+                console.error('Error updating mapping:', data.error);
+            }
+        } catch (error) {
+            console.error('Error updating mapping:', error);
+        }
+    }
+    
+    // Update field validation display
+    function updateFieldValidation(selectElement) {
+        const csvField = selectElement.dataset.csvField;
+        const selectedOption = selectElement.selectedOptions[0];
+        const validationFeedback = document.querySelector(`[data-csv-field="${csvField}"].field-validation-feedback`);
+        
+        if (selectedOption && selectedOption.value) {
+            const isRequired = selectedOption.dataset.required === 'True';
+            const fieldType = selectedOption.dataset.type;
+            
+            let feedback = `<small class="text-info">Type: ${fieldType}`;
+            if (isRequired) {
+                feedback += ' <span class="text-danger">(Required)</span>';
+            }
+            feedback += '</small>';
+            
+            validationFeedback.innerHTML = feedback;
+            validationFeedback.style.display = 'block';
+        } else {
+            validationFeedback.style.display = 'none';
+        }
+    }
+    
+    // Validate current mapping
+    async function validateCurrentMapping() {
+        const mappings = {};
+        mappingSelects.forEach(select => {
+            if (select.value) {
+                mappings[select.dataset.csvField] = select.value;
             }
         });
+        
+        try {
+            const response = await fetch('/api/validate-mapping/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    model_name: modelName,
+                    field_mappings: mappings,
+                    sample_data: previewData.slice(0, 5)
+                })
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                displayValidationResults(data.validation, data.validation_score, data.is_valid);
+            } else {
+                showAlert('danger', 'Validation error: ' + data.error);
+            }
+        } catch (error) {
+            console.error('Validation error:', error);
+            showAlert('danger', 'Error during validation');
+        }
+    }
+    
+    // Display validation results
+    function displayValidationResults(validation, score, isValid) {
+        let html = '';
+        
+        // Validation score
+        const scoreSpan = document.getElementById('validationScore');
+        scoreSpan.textContent = `${score}%`;
+        scoreSpan.className = `badge ${isValid ? 'bg-success' : score > 70 ? 'bg-warning' : 'bg-danger'} ms-2`;
+        
+        // Missing required fields
+        if (validation.missing_required_fields.length > 0) {
+            html += `
+                <div class="alert alert-danger">
+                    <strong>Missing Required Fields:</strong>
+                    <ul class="mb-0">
+                        ${validation.missing_required_fields.map(field => `<li>${field}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+        
+        // Mapping errors
+        if (validation.mapping_errors.length > 0) {
+            html += `
+                <div class="alert alert-warning">
+                    <strong>Mapping Errors:</strong>
+                    <ul class="mb-0">
+                        ${validation.mapping_errors.map(error => 
+                            `<li>${error.csv_field} → ${error.model_field}: ${error.error}</li>`
+                        ).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+        
+        // Sample validation errors
+        if (validation.sample_validation.length > 0) {
+            html += `
+                <div class="alert alert-info">
+                    <strong>Sample Data Issues:</strong>
+                    <div class="accordion" id="sampleErrorsAccordion">
+            `;
+            validation.sample_validation.forEach((row, index) => {
+                html += `
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+                                    data-bs-target="#row${index}">
+                                Row ${row.row_index + 1} (${row.errors.length} issues)
+                            </button>
+                        </h2>
+                        <div id="row${index}" class="accordion-collapse collapse">
+                            <div class="accordion-body">
+                                <ul class="mb-0">
+                                    ${row.errors.map(error => 
+                                        `<li>${error.csv_field} → ${error.model_field}: ${error.error} (Value: "${error.value}")</li>`
+                                    ).join('')}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div></div>';
+        }
+        
+        // Success message
+        if (isValid) {
+            html += '<div class="alert alert-success"><i class="fas fa-check-circle"></i> All mappings are valid!</div>';
+        }
+        
+        document.getElementById('validationContent').innerHTML = html;
+        validationResults.style.display = 'block';
+    }
+    
+    // Auto-suggest mappings
+    async function autoSuggestMappings() {
+        const csvHeaders = Array.from(mappingSelects).map(select => select.dataset.csvField);
+        
+        try {
+            const params = new URLSearchParams({
+                model_name: modelName,
+                csv_headers: csvHeaders
+            });
+            
+            const response = await fetch(`/api/suggest-mappings/?${params}`);
+            const data = await response.json();
+            
+            if (data.success) {
+                applySuggestions(data.suggestions);
+                showAlert('success', 'Auto-suggestions applied successfully!');
+            } else {
+                showAlert('danger', 'Error getting suggestions: ' + data.error);
+            }
+        } catch (error) {
+            console.error('Auto-suggest error:', error);
+            showAlert('danger', 'Error during auto-suggestion');
+        }
+    }
+    
+    // Apply suggestions to form
+    function applySuggestions(suggestions) {
+        Object.entries(suggestions).forEach(([csvField, suggestion]) => {
+            const select = document.querySelector(`[data-csv-field="${csvField}"]`);
+            if (select && suggestion.suggested_field) {
+                select.value = suggestion.suggested_field;
+                updateMapping(select);
+                updateFieldValidation(select);
+                
+                // Show confidence badge
+                const confidenceBadge = document.querySelector(`[data-csv-field="${csvField}"].confidence-badge`);
+                if (confidenceBadge) {
+                    confidenceBadge.textContent = `${suggestion.confidence}% confidence`;
+                    confidenceBadge.className = `badge ${suggestion.confidence > 80 ? 'bg-success' : suggestion.confidence > 60 ? 'bg-warning' : 'bg-secondary'} confidence-badge`;
+                    confidenceBadge.style.display = 'inline-block';
+                }
+            }
+        });
+    }
+    
+    // Show data preview modal
+    function showDataPreview(csvField) {
+        const fieldData = previewData.map((row, index) => ({
+            row: index + 1,
+            value: row[csvField] || 'N/A'
+        }));
+        
+        let html = `
+            <h6>Sample values for "${csvField}":</h6>
+            <div class="table-responsive">
+                <table class="table table-sm table-striped">
+                    <thead>
+                        <tr><th>Row</th><th>Value</th></tr>
+                    </thead>
+                    <tbody>
+                        ${fieldData.map(item => 
+                            `<tr><td>${item.row}</td><td>${item.value}</td></tr>`
+                        ).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+        
+        document.getElementById('previewContent').innerHTML = html;
+        new bootstrap.Modal(document.getElementById('dataPreviewModal')).show();
+    }
+    
+    // Show alert message
+    function showAlert(type, message) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        const form = document.getElementById('mapping-form');
+        form.insertBefore(alertDiv, form.firstChild);
+        
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 5000);
+    }
+    
+    // Initialize field validations
+    mappingSelects.forEach(select => {
+        if (select.value) {
+            updateFieldValidation(select);
+        }
     });
 });
 </script>

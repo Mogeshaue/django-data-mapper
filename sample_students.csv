@@ -1,0 +1,6 @@
+full_name,student_email,student_phone,roll_number,student_gender,birth_date,student_department,year_studying,home_address,blood_type,student_category,hostel_residence,parent_contact
+John Smith,john.smith@college.edu,9876543210,CS2021001,Male,2003-05-15,Computer Science,2nd Year,123 Main St Delhi,O+,Academic,Hostel,9876543211
+Jane Doe,jane.doe@college.edu,9876543212,CS2021002,Female,2003-08-22,Computer Science,2nd Year,456 Park Ave Mumbai,A+,Academic,Hostel,9876543213
+Bob Johnson,bob.johnson@college.edu,9876543214,ME2021001,Male,2002-12-10,Mechanical Engineering,3rd Year,789 Oak Road Chennai,B+,Academic,Dayscholar,9876543215
+Alice Brown,alice.brown@college.edu,9876543216,EC2021001,Female,2003-03-18,Electronics,2nd Year,321 Pine St Bangalore,AB+,Academic,Hostel,9876543217
+Charlie Wilson,charlie.wilson@college.edu,9876543218,CS2020001,Male,2002-07-25,Computer Science,3rd Year,654 Elm Ave Hyderabad,O-,Academic,Dayscholar,9876543219
