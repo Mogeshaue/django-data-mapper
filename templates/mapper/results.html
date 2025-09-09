@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+
+{% block title %}Results - Data Mapper{% endblock %}
+
+{% block content %}
+<div class="step-indicator">
+    <div class="step completed">
+        <i class="fas fa-upload"></i> Upload File
+    </div>
+    <div class="step completed">
+        <i class="fas fa-database"></i> Select Model
+    </div>
+    <div class="step completed">
+        <i class="fas fa-arrows-alt-h"></i> Map Fields
+    </div>
+    <div class="step active">
+        <i class="fas fa-check-circle"></i> Results
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">
+                <h4><i class="fas fa-check-circle"></i> Processing Complete</h4>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-6">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h2 class="text-success">{{ valid_count }}</h2>
+                                <p>Valid Records</p>
+                                {% if valid_count > 0 %}
+                                    <a href="{% url 'download_json' session.id %}" class="btn btn-success">
+                                        <i class="fas fa-download"></i> Download JSON
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h2 class="text-danger">{{ invalid_count }}</h2>
+                                <p>Invalid Records</p>
+                                {% if invalid_count > 0 %}
+                                    <a href="{% url 'download_errors' session.id %}" class="btn btn-danger">
+                                        <i class="fas fa-download"></i> Download Errors
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        {% if preview_valid %}
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">
+                <h5><i class="fas fa-check"></i> Valid Records Preview (First 10)</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                        <thead>
+                            <tr>
+                                {% for key in preview_valid.0.keys %}
+                                    <th>{{ key }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for record in preview_valid %}
+                                <tr>
+                                    {% for value in record.values %}
+                                        <td>{{ value|default:"-" }}</td>
+                                    {% endfor %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if preview_invalid %}
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <h5><i class="fas fa-times"></i> Invalid Records Preview (First 10)</h5>
+            </div>
+            <div class="card-body">
+                {% for error_item in preview_invalid %}
+                    <div class="error-item">
+                        <h6>Row {{ error_item.row }}</h6>
+                        <div class="mb-2">
+                            <strong>Errors:</strong>
+                            <ul class="mb-0">
+                                {% for error in error_item.errors %}
+                                    <li>
+                                        <strong>{{ error.field }}:</strong> {{ error.error }}
+                                        (value: "{{ error.value }}")
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        
+        <div class="mt-4">
+            <a href="{% url 'index' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Process Another File
+            </a>
+            <a href="{% url 'field_mapping' session.id %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Mapping
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,11 @@
+name,sku,description,price,quantity,category,is_active
+Laptop Pro 15,LAP-001,High-performance laptop with 16GB RAM,1299.99,50,Electronics,true
+Wireless Mouse,MSE-002,Ergonomic wireless mouse with USB receiver,29.99,200,Accessories,true
+Office Chair,CHR-003,Comfortable office chair with lumbar support,249.99,25,Furniture,true
+USB-C Hub,HUB-004,7-in-1 USB-C hub with HDMI and card reader,49.99,100,Accessories,true
+Monitor 27,MON-005,27-inch 4K IPS monitor,399.99,30,Electronics,true
+Keyboard Mechanical,KBD-006,RGB mechanical keyboard with blue switches,89.99,75,Accessories,true
+Standing Desk,DSK-007,Electric height-adjustable standing desk,599.99,15,Furniture,true
+Webcam HD,CAM-008,1080p HD webcam with microphone,79.99,60,Electronics,true
+Desk Lamp,LMP-009,LED desk lamp with adjustable brightness,39.99,80,Furniture,false
+Laptop Bag,BAG-010,Professional laptop bag with multiple compartments,59.99,40,Accessories,true

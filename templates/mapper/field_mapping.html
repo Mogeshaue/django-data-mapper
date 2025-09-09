@@ -1,0 +1,169 @@
+{% extends 'base.html' %}
+{% load custom_filters %}
+
+{% block title %}Map Fields - Data Mapper{% endblock %}
+
+{% block content %}
+<div class="step-indicator">
+    <div class="step completed">
+        <i class="fas fa-upload"></i> Upload File
+    </div>
+    <div class="step completed">
+        <i class="fas fa-database"></i> Select Model
+    </div>
+    <div class="step active">
+        <i class="fas fa-arrows-alt-h"></i> Map Fields
+    </div>
+    <div class="step">
+        <i class="fas fa-check-circle"></i> Results
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4><i class="fas fa-arrows-alt-h"></i> Map Fields</h4>
+                <small>Map CSV/Excel columns to {{ session.target_model }} fields</small>
+            </div>
+            <div class="card-body">
+                <form id="mapping-form" method="post" action="{% url 'process_file' session.id %}">
+                    {% csrf_token %}
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> 
+                        Suggested mappings have been auto-detected. Please review and adjust as needed.
+                    </div>
+                    
+                    <div class="mb-4">
+                        {% for csv_field in csv_headers %}
+                        <div class="field-mapping-row row align-items-center">
+                            <div class="col-md-5">
+                                <label class="form-label">
+                                    <strong>{{ csv_field }}</strong>
+                                    <small class="text-muted">(CSV/Excel)</small>
+                                </label>
+                            </div>
+                            <div class="col-md-2 text-center">
+                                <i class="fas fa-arrow-right text-primary"></i>
+                            </div>
+                            <div class="col-md-5">
+                                <select class="form-select mapping-select" 
+                                        data-csv-field="{{ csv_field }}">
+                                    <option value="">-- Skip this field --</option>
+                                    {% for field_name, field_info in model_fields.items %}
+                                        <option value="{{ field_name }}" 
+                                                {% if field_mappings|get_item:csv_field == field_name %}selected{% endif %}>
+                                            {{ field_name }}
+                                            {% if field_info.required %}<span class="text-danger">*</span>{% endif %}
+                                            ({{ field_info.type }})
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'model_selection' session.id %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Back
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-cogs"></i> Process File
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5><i class="fas fa-list"></i> Model Fields</h5>
+            </div>
+            <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                <dl>
+                    {% for field_name, field_info in model_fields.items %}
+                        <dt>
+                            {{ field_name }}
+                            {% if field_info.required %}<span class="text-danger">*</span>{% endif %}
+                        </dt>
+                        <dd class="text-muted mb-3">
+                            <small>
+                                Type: {{ field_info.type }}<br>
+                                {% if field_info.max_length %}Max length: {{ field_info.max_length }}<br>{% endif %}
+                                {% if field_info.help_text %}{{ field_info.help_text }}{% endif %}
+                            </small>
+                        </dd>
+                    {% endfor %}
+                </dl>
+            </div>
+        </div>
+        
+        {% if preview_data %}
+        <div class="card mt-3">
+            <div class="card-header bg-secondary text-white">
+                <h5><i class="fas fa-eye"></i> Data Preview</h5>
+            </div>
+            <div class="card-body preview-table">
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                        <thead>
+                            <tr>
+                                {% for key in preview_data.0.keys %}
+                                    <th>{{ key|truncatechars:15 }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in preview_data %}
+                                <tr>
+                                    {% for value in row.values %}
+                                        <td>{{ value|truncatechars:15 }}</td>
+                                    {% endfor %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Update mappings via AJAX when changed
+    $('.mapping-select').on('change', function() {
+        var csvField = $(this).data('csv-field');
+        var modelField = $(this).val();
+        
+        $.ajax({
+            url: "{% url 'update_mapping' session.id %}",
+            type: 'POST',
+            data: JSON.stringify({
+                'csv_field': csvField,
+                'model_field': modelField
+            }),
+            contentType: 'application/json',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            success: function(response) {
+                if (response.success) {
+                    console.log('Mapping updated successfully');
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Error updating mapping:', error);
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

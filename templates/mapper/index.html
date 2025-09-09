@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+
+{% block title %}Upload File - Data Mapper{% endblock %}
+
+{% block content %}
+<div class="step-indicator">
+    <div class="step active">
+        <i class="fas fa-upload"></i> Upload File
+    </div>
+    <div class="step">
+        <i class="fas fa-database"></i> Select Model
+    </div>
+    <div class="step">
+        <i class="fas fa-arrows-alt-h"></i> Map Fields
+    </div>
+    <div class="step">
+        <i class="fas fa-check-circle"></i> Results
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4><i class="fas fa-upload"></i> Upload CSV or Excel File</h4>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'upload_file' %}" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="mb-4">
+                        <label for="file" class="form-label">Select a file to upload:</label>
+                        <input type="file" class="form-control" id="file" name="file" 
+                               accept=".csv,.xlsx,.xls" required>
+                        <div class="form-text">
+                            Supported formats: CSV (.csv), Excel (.xlsx, .xls)
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <h5><i class="fas fa-info-circle"></i> How it works:</h5>
+                        <ol class="mb-0">
+                            <li>Upload your CSV or Excel file</li>
+                            <li>Select the target Django model</li>
+                            <li>Map your file columns to model fields</li>
+                            <li>Preview and download the processed JSON data</li>
+                        </ol>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-arrow-right"></i> Upload and Continue
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
